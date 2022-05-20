@@ -110,6 +110,11 @@
 
 (def ref-key second)
 
+(defn component-id [ref]
+  (let [rk (ref-key ref)]
+    (if (= 2 (count rk))
+      rk
+      (vec (take 2 rk)))))
 
 (def component? (m/validator Component))
 ;;---
@@ -174,10 +179,10 @@
 
 (defn- resolve-ref
   [system referencing-component-id ref]
-  (let [[component-group component-name :as referenced-component-id] (ref-key ref)]
+  (let [[component-group component-name :as k] (ref-key ref)]
     (when-not (contains? (sp/select-one [::instances component-group] system) component-name)
-      (throw (ref-exception system referencing-component-id referenced-component-id)))
-    (sp/select-one [::instances referenced-component-id] system)))
+      (throw (ref-exception system referencing-component-id (component-id ref))))
+    (sp/select-one [::instances k] system)))
 
 (defn group-ref-exception
   [_system referencing-component-id referenced-component-group-name]
@@ -277,7 +282,7 @@
                       (ref [group-name (ref-key x)])
 
                       (= :full-ref rt)
-                      x)))
+                      (ref (component-id x)))))
                 system))
 
 (defn- ref-edges
@@ -288,13 +293,12 @@
                    sp/ALL
                    (sp/collect-one sp/FIRST)
                    sp/LAST
-                   (sp/walker ref?)
-                   ref-key])
+                   (sp/walker ref?)])
        (map (fn [[group-name component-name ref]]
               (if (= :topsort direction)
                 [[group-name component-name]
-                 (ref-key ref)]
-                [(ref-key ref)
+                 (component-id ref)]
+                [(component-id ref)
                  [group-name component-name]])))))
 
 (defn- component-graph-add-edges
